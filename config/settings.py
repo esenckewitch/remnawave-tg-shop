@@ -46,6 +46,15 @@ class Settings(BaseSettings):
         description="When true, new YooKassa payments in autopay mode force card binding without a user checkbox."
     )
 
+    NALOGO_INN: Optional[str] = Field(
+        default=None,
+        description="INN for nalog.ru (self-employed) authentication"
+    )
+    NALOGO_PASSWORD: Optional[str] = Field(
+        default=None,
+        description="Password for nalog.ru (self-employed) authentication"
+    )
+
     WEBHOOK_BASE_URL: Optional[str] = None
 
     CRYPTOPAY_TOKEN: Optional[str] = None
@@ -488,9 +497,22 @@ class Settings(BaseSettings):
         return methods or default_order
     
     # Logging Configuration
+    LOG_LEVEL: str = Field(
+        default="INFO",
+        description="Global log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)",
+    )
     LOG_CHAT_ID: Optional[int] = Field(default=None, description="Telegram chat/group ID for sending notifications")
     LOG_THREAD_ID: Optional[int] = Field(default=None, description="Thread ID for supergroup messages (optional)")
     
+    @field_validator('LOG_LEVEL', mode='before')
+    @classmethod
+    def normalize_log_level(cls, v):
+        if isinstance(v, str):
+            v = v.strip().upper()
+        if not v:
+            return "INFO"
+        return v
+
     @field_validator('LOG_CHAT_ID', 'LOG_THREAD_ID', mode='before')
     @classmethod
     def validate_optional_int_fields(cls, v):
@@ -555,6 +577,16 @@ def get_settings() -> Settings:
             if not _settings_instance.YOOKASSA_SHOP_ID or not _settings_instance.YOOKASSA_SECRET_KEY:
                 logging.warning(
                     "CRITICAL: YooKassa credentials (SHOP_ID or SECRET_KEY) are not set. Payments will not work."
+                )
+            if (
+                _settings_instance.NALOGO_INN
+                or _settings_instance.NALOGO_PASSWORD
+            ) and not (
+                _settings_instance.NALOGO_INN
+                and _settings_instance.NALOGO_PASSWORD
+            ):
+                logging.warning(
+                    "WARNING: Nalogo credentials are incomplete. Receipt sending will be disabled."
                 )
             if _settings_instance.FREEKASSA_ENABLED:
                 if (
