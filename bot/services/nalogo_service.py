@@ -79,7 +79,7 @@ class NalogoService:
                 services=[service_item],
                 total_amount=str(total_amount),
                 client=client or IncomeClient(),
-                payment_type=PaymentType.ACCOUNT,
+                payment_type=PaymentType.WIRE,
                 ignore_max_total_income_restriction=False,
             )
             response = await self._client.http_client.post(
