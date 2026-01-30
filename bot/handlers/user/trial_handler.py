@@ -33,13 +33,15 @@ async def schedule_not_connected_reminder(
     connect_button_url: Optional[str] = None,
 ):
     """
-    Background task that waits 5-10 minutes after trial activation,
+    Background task that waits after trial activation,
     then checks if user has connected any devices.
     If not connected, sends a reminder message.
     """
     try:
-        # Wait 5-10 minutes (random to avoid all reminders at exact same time)
-        delay_seconds = random.randint(300, 600)  # 5-10 minutes
+        # Wait before checking if user connected (random to avoid all reminders at exact same time)
+        # TODO: restore to 300-600 (5-10 minutes) after testing
+        delay_seconds = random.randint(30, 60)  # 30-60 seconds for testing
+        logging.info(f"Reminder task started for user {user_id}, will check in {delay_seconds} seconds")
         await asyncio.sleep(delay_seconds)
 
         # Check if user has connected any devices
@@ -193,7 +195,8 @@ async def request_trial_confirmation_handler(
         # Schedule reminder if user doesn't connect within 5-10 minutes
         panel_user_uuid = activation_result.get("panel_user_uuid")
         if panel_user_uuid:
-            asyncio.create_task(
+            logging.info(f"Scheduling not-connected reminder for user {user_id} (panel_uuid: {panel_user_uuid})")
+            task = asyncio.create_task(
                 schedule_not_connected_reminder(
                     bot=callback.bot,
                     user_id=user_id,
@@ -204,6 +207,10 @@ async def request_trial_confirmation_handler(
                     current_lang=current_lang,
                     connect_button_url=connect_button_url_for_trial,
                 )
+            )
+            task.add_done_callback(
+                lambda t: logging.error(f"Reminder task for user {user_id} failed: {t.exception()}")
+                if t.exception() else None
             )
     else:
         message_key_from_service = (
@@ -412,7 +419,8 @@ async def confirm_activate_trial_handler(
         # Schedule reminder if user doesn't connect within 5-10 minutes
         panel_user_uuid = activation_result.get("panel_user_uuid")
         if panel_user_uuid:
-            asyncio.create_task(
+            logging.info(f"Scheduling not-connected reminder for user {user_id} (panel_uuid: {panel_user_uuid})")
+            task = asyncio.create_task(
                 schedule_not_connected_reminder(
                     bot=callback.bot,
                     user_id=user_id,
@@ -423,6 +431,10 @@ async def confirm_activate_trial_handler(
                     current_lang=current_lang,
                     connect_button_url=connect_button_url_for_trial,
                 )
+            )
+            task.add_done_callback(
+                lambda t: logging.error(f"Reminder task for user {user_id} failed: {t.exception()}")
+                if t.exception() else None
             )
 
 
