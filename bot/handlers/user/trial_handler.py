@@ -39,8 +39,7 @@ async def schedule_not_connected_reminder(
     """
     try:
         # Wait before checking if user connected (random to avoid all reminders at exact same time)
-        # TODO: restore to 300-600 (5-10 minutes) after testing
-        delay_seconds = random.randint(30, 60)  # 30-60 seconds for testing
+        delay_seconds = random.randint(300, 600)  # 5-10 minutes
         logging.info(f"Reminder task started for user {user_id}, will check in {delay_seconds} seconds")
         await asyncio.sleep(delay_seconds)
 
@@ -62,7 +61,7 @@ async def schedule_not_connected_reminder(
 
         reminder_text = _("trial_not_connected_reminder")
 
-        # Build keyboard with connect button
+        # Build keyboard with connect button and support
         keyboard = None
         if connect_button_url:
             from bot.keyboards.inline.user_keyboards import get_connect_and_main_keyboard
@@ -72,6 +71,7 @@ async def schedule_not_connected_reminder(
                 settings,
                 config_link=None,
                 connect_button_url=connect_button_url,
+                include_support=True,
             )
 
         await bot.send_message(

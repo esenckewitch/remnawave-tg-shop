@@ -368,7 +368,8 @@ def get_connect_and_main_keyboard(
         settings: Settings,
         config_link: Optional[str],
         connect_button_url: Optional[str] = None,
-        preserve_message: bool = False) -> InlineKeyboardMarkup:
+        preserve_message: bool = False,
+        include_support: bool = False) -> InlineKeyboardMarkup:
     """Keyboard with a connect button and a back to main menu button."""
     _ = lambda key, **kwargs: i18n_instance.gettext(lang, key, **kwargs)
     builder = InlineKeyboardBuilder()
@@ -390,6 +391,14 @@ def get_connect_and_main_keyboard(
             InlineKeyboardButton(
                 text=_("connect_button"),
                 callback_data="main_action:my_subscription",
+            )
+        )
+
+    if include_support and settings.SUPPORT_LINK:
+        builder.row(
+            InlineKeyboardButton(
+                text=_("menu_support_button"),
+                url=settings.SUPPORT_LINK,
             )
         )
 
