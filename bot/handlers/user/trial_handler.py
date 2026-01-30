@@ -1,4 +1,6 @@
 import logging
+import asyncio
+import random
 from aiogram import Router, F, types, Bot
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,6 +20,68 @@ from bot.middlewares.i18n import JsonI18n
 from .start import send_main_menu
 
 router = Router(name="user_trial_router")
+
+
+async def schedule_not_connected_reminder(
+    bot: Bot,
+    user_id: int,
+    panel_user_uuid: str,
+    panel_service: PanelApiService,
+    settings: Settings,
+    i18n,
+    current_lang: str,
+    connect_button_url: Optional[str] = None,
+):
+    """
+    Background task that waits 5-10 minutes after trial activation,
+    then checks if user has connected any devices.
+    If not connected, sends a reminder message.
+    """
+    try:
+        # Wait 5-10 minutes (random to avoid all reminders at exact same time)
+        delay_seconds = random.randint(300, 600)  # 5-10 minutes
+        await asyncio.sleep(delay_seconds)
+
+        # Check if user has connected any devices
+        devices_response = await panel_service.get_user_devices(panel_user_uuid)
+
+        has_devices = False
+        if devices_response:
+            devices_list = devices_response.get("devices") if isinstance(devices_response, dict) else devices_response
+            if isinstance(devices_list, list) and len(devices_list) > 0:
+                has_devices = True
+
+        if has_devices:
+            logging.debug(f"User {user_id} has connected devices, skipping reminder")
+            return
+
+        # User hasn't connected - send reminder
+        _ = lambda key, **kwargs: i18n.gettext(current_lang, key, **kwargs) if i18n else key
+
+        reminder_text = _("trial_not_connected_reminder")
+
+        # Build keyboard with connect button
+        keyboard = None
+        if connect_button_url:
+            from bot.keyboards.inline.user_keyboards import get_connect_and_main_keyboard
+            keyboard = get_connect_and_main_keyboard(
+                current_lang,
+                i18n,
+                settings,
+                config_link=None,
+                connect_button_url=connect_button_url,
+            )
+
+        await bot.send_message(
+            chat_id=user_id,
+            text=reminder_text,
+            reply_markup=keyboard,
+            parse_mode="HTML",
+        )
+        logging.info(f"Sent not-connected reminder to user {user_id}")
+
+    except Exception as e:
+        logging.error(f"Error in not-connected reminder for user {user_id}: {e}")
 
 
 async def request_trial_confirmation_handler(
@@ -125,6 +189,22 @@ async def request_trial_confirmation_handler(
         except Exception as e_mark:
             await session.rollback()
             logging.error(f"Failed to mark trial for ad attribution for user {user_id}: {e_mark}")
+
+        # Schedule reminder if user doesn't connect within 5-10 minutes
+        panel_user_uuid = activation_result.get("panel_user_uuid")
+        if panel_user_uuid:
+            asyncio.create_task(
+                schedule_not_connected_reminder(
+                    bot=callback.bot,
+                    user_id=user_id,
+                    panel_user_uuid=panel_user_uuid,
+                    panel_service=subscription_service.panel_service,
+                    settings=settings,
+                    i18n=i18n,
+                    current_lang=current_lang,
+                    connect_button_url=connect_button_url_for_trial,
+                )
+            )
     else:
         message_key_from_service = (
             activation_result.get("message_key", "trial_activation_failed")
@@ -328,6 +408,22 @@ async def confirm_activate_trial_handler(
         except Exception as e_mark:
             await session.rollback()
             logging.error(f"Failed to mark trial for ad attribution for user {user_id}: {e_mark}")
+
+        # Schedule reminder if user doesn't connect within 5-10 minutes
+        panel_user_uuid = activation_result.get("panel_user_uuid")
+        if panel_user_uuid:
+            asyncio.create_task(
+                schedule_not_connected_reminder(
+                    bot=callback.bot,
+                    user_id=user_id,
+                    panel_user_uuid=panel_user_uuid,
+                    panel_service=subscription_service.panel_service,
+                    settings=settings,
+                    i18n=i18n,
+                    current_lang=current_lang,
+                    connect_button_url=connect_button_url_for_trial,
+                )
+            )
 
 
 @router.callback_query(F.data == "main_action:cancel_trial")
