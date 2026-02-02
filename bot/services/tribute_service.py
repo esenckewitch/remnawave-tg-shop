@@ -154,9 +154,9 @@ class TributeService:
         elif event_name == "digitalProductRefund":
             logging.info(f"Tribute webhook: refund received for product {payload.get('product_id')}")
             return web.Response(text="OK")
-        elif event_name in ("newSubscription", "renewedSubscription"):
+        elif event_name in ("newSubscription", "renewedSubscription", "new_subscription", "renewed_subscription"):
             return await self._handle_subscription_event(data, payload)
-        elif event_name == "cancelledSubscription":
+        elif event_name in ("cancelledSubscription", "cancelled_subscription"):
             logging.info(f"Tribute webhook: subscription cancelled for user {payload.get('telegram_user_id')}")
             return web.Response(text="OK")
         else:
@@ -291,15 +291,135 @@ class TributeService:
         payload: Dict[str, Any]
     ) -> web.Response:
         """Handle subscription events (new or renewed)."""
-        # Similar to digital product, but for recurring subscriptions
         telegram_user_id = payload.get("telegram_user_id")
         if not telegram_user_id:
             logging.error("Tribute subscription webhook: missing telegram_user_id")
             return web.Response(status=400, text="missing_telegram_user_id")
 
-        # For subscriptions, we might receive different payload structure
-        # Process similarly to digital products
-        return await self._handle_new_digital_product(data, payload)
+        try:
+            telegram_user_id = int(telegram_user_id)
+        except (TypeError, ValueError):
+            logging.error(f"Tribute subscription webhook: invalid telegram_user_id: {telegram_user_id}")
+            return web.Response(status=400, text="invalid_telegram_user_id")
+
+        # Parse subscription-specific fields
+        subscription_id = payload.get("subscription_id")
+        period = payload.get("period", "monthly")
+        amount = payload.get("amount", 0)
+        currency = payload.get("currency", "rub").upper()
+        tribute_user_id = payload.get("user_id")
+        period_id = payload.get("period_id")
+
+        # Determine months from period
+        period_to_months = {
+            "monthly": 1,
+            "quarterly": 3,
+            "yearly": 12,
+            "half_yearly": 6,
+            "weekly": 0.25,  # ~1 week
+        }
+        months = period_to_months.get(period, 1)
+
+        # Convert amount to float (RUB is in kopecks from Tribute)
+        amount_float = float(amount) / 100 if currency in ("USD", "EUR") else float(amount)
+
+        async with self.async_session_factory() as session:
+            # Check if user exists
+            db_user = await user_dal.get_user_by_id(session, telegram_user_id)
+            if not db_user:
+                logging.warning(f"Tribute subscription webhook: user {telegram_user_id} not found in database")
+                try:
+                    db_user = await user_dal.create_user(session, {
+                        "user_id": telegram_user_id,
+                        "first_name": "Tribute User",
+                        "language_code": self.settings.DEFAULT_LANGUAGE,
+                    })
+                    await session.commit()
+                    logging.info(f"Tribute subscription webhook: created new user {telegram_user_id}")
+                except Exception as e:
+                    logging.error(f"Tribute subscription webhook: failed to create user {telegram_user_id}: {e}")
+                    return web.Response(status=500, text="user_creation_failed")
+
+            # Create unique provider_payment_id for subscriptions
+            provider_payment_id = f"tribute_sub:{subscription_id}:{period_id}:{tribute_user_id}"
+
+            # Check for duplicate
+            existing = await payment_dal.get_payment_by_provider_payment_id(session, provider_payment_id)
+            if existing:
+                logging.info(f"Tribute subscription webhook: duplicate payment {provider_payment_id}, already processed")
+                return web.Response(text="OK")
+
+            # Create payment record
+            payment_record = await payment_dal.create_payment(session, {
+                "user_id": telegram_user_id,
+                "amount": amount_float,
+                "currency": currency,
+                "months": months if months >= 1 else 1,
+                "status": "pending",
+                "provider": "tribute",
+                "provider_payment_id": provider_payment_id,
+            })
+            await session.commit()
+            payment_db_id = payment_record.id
+
+            logging.info(f"Tribute subscription webhook: created payment {payment_db_id} for user {telegram_user_id}, {months} month(s)")
+
+            # Activate subscription
+            activation = None
+            try:
+                activation = await self.subscription_service.activate_subscription(
+                    session=session,
+                    user_id=telegram_user_id,
+                    months=months if months >= 1 else 1,
+                    payment_amount=amount_float,
+                    payment_db_id=payment_db_id,
+                    provider="tribute",
+                    sale_mode="subscription",
+                )
+            except Exception as e:
+                logging.error(f"Tribute subscription webhook: activation failed for user {telegram_user_id}: {e}")
+
+            # Update payment status
+            if activation:
+                await payment_dal.update_payment_status_by_db_id(session, payment_db_id, "succeeded")
+                logging.info(f"Tribute subscription webhook: subscription activated for user {telegram_user_id}, ends {activation.get('end_date')}")
+            else:
+                await payment_dal.update_payment_status_by_db_id(session, payment_db_id, "failed")
+                logging.error(f"Tribute subscription webhook: activation returned None for user {telegram_user_id}")
+
+            # Apply referral bonuses
+            referral_bonus = None
+            if activation:
+                try:
+                    referral_bonus = await self.referral_service.apply_referral_bonuses_for_payment(
+                        session=session,
+                        referee_user_id=telegram_user_id,
+                        payment_amount=amount_float,
+                        payment_id=payment_db_id,
+                    )
+                except Exception as e:
+                    logging.warning(f"Tribute subscription webhook: referral bonus failed: {e}")
+
+            await session.commit()
+
+            # Send notification to user
+            if activation:
+                try:
+                    await self._send_success_notification(
+                        session=session,
+                        user_id=telegram_user_id,
+                        months=months if months >= 1 else 1,
+                        activation=activation,
+                        referral_bonus=referral_bonus,
+                        sale_mode="subscription",
+                        db_user=db_user,
+                        amount=amount_float,
+                        currency=currency,
+                    )
+                except Exception as e:
+                    logging.error(f"Tribute subscription webhook: failed to send notification: {e}")
+
+        return web.Response(text="OK")
 
     async def _send_success_notification(
         self,
