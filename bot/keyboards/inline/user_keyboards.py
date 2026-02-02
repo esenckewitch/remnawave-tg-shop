@@ -146,6 +146,14 @@ def get_payment_method_keyboard(months: int, price: float,
                 text=_("pay_with_yookassa_button"),
                 callback_data=f"pay_yk:{value_str}:{price}{mode_suffix}",
             )
+        elif method == "tribute" and settings.TRIBUTE_ENABLED:
+            # Tribute uses pre-configured links per duration
+            tribute_link = settings.tribute_links.get(int(float(months)))
+            if tribute_link:
+                builder.button(
+                    text=_("pay_with_tribute_button"),
+                    callback_data=f"pay_tribute:{value_str}:{price}{mode_suffix}",
+                )
         elif method == "stars" and settings.STARS_ENABLED and stars_price is not None:
             builder.button(
                 text=_("pay_with_stars_button"),

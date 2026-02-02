@@ -108,6 +108,24 @@ class Settings(BaseSettings):
         description="Lifetime of the payment link in minutes (30-4320, defaults to provider value)",
     )
 
+    TRIBUTE_ENABLED: bool = Field(default=False)
+    TRIBUTE_API_KEY: Optional[str] = Field(
+        default=None,
+        description="API key for verifying Tribute webhook signatures (HMAC-SHA256)"
+    )
+    TRIBUTE_LINK_1_MONTH: Optional[str] = Field(default=None)
+    TRIBUTE_LINK_3_MONTHS: Optional[str] = Field(default=None)
+    TRIBUTE_LINK_6_MONTHS: Optional[str] = Field(default=None)
+    TRIBUTE_LINK_12_MONTHS: Optional[str] = Field(default=None)
+    TRIBUTE_SKIP_NOTIFICATIONS: bool = Field(
+        default=True,
+        description="Skip renewal notifications for Tribute payments (handled by Tribute)"
+    )
+    TRIBUTE_SKIP_CANCELLATION_NOTIFICATIONS: bool = Field(
+        default=False,
+        description="Skip cancellation notifications for Tribute payments"
+    )
+
     YOOKASSA_ENABLED: bool = Field(default=True)
     STARS_ENABLED: bool = Field(default=True)
     PAYMENT_METHODS_ORDER: Optional[str] = Field(
@@ -358,6 +376,34 @@ class Settings(BaseSettings):
             return f"{base.rstrip('/')}{self.platega_webhook_path}"
         return None
 
+    @computed_field
+    @property
+    def tribute_webhook_path(self) -> str:
+        return "/webhook/tribute"
+
+    @computed_field
+    @property
+    def tribute_full_webhook_url(self) -> Optional[str]:
+        base = self.WEBHOOK_BASE_URL
+        if base:
+            return f"{base.rstrip('/')}{self.tribute_webhook_path}"
+        return None
+
+    @computed_field
+    @property
+    def tribute_links(self) -> Dict[int, str]:
+        """Mapping of months to Tribute payment links."""
+        links: Dict[int, str] = {}
+        if self.TRIBUTE_LINK_1_MONTH:
+            links[1] = self.TRIBUTE_LINK_1_MONTH
+        if self.TRIBUTE_LINK_3_MONTHS:
+            links[3] = self.TRIBUTE_LINK_3_MONTHS
+        if self.TRIBUTE_LINK_6_MONTHS:
+            links[6] = self.TRIBUTE_LINK_6_MONTHS
+        if self.TRIBUTE_LINK_12_MONTHS:
+            links[12] = self.TRIBUTE_LINK_12_MONTHS
+        return links
+
     # Computed YooKassa receipt fields based on recurring toggle
     @computed_field
     @property
@@ -501,6 +547,7 @@ class Settings(BaseSettings):
             "platega",
             "severpay",
             "yookassa",
+            "tribute",
             "stars",
             "cryptopay",
         ]
