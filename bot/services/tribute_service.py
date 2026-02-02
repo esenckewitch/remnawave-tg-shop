@@ -188,8 +188,8 @@ class TributeService:
         # Determine subscription duration from product
         months = self._parse_months_from_product(product_id, amount)
 
-        # Convert amount to float (Tribute sends cents/smallest units for some currencies)
-        amount_float = float(amount) / 100 if currency in ("USD", "EUR") else float(amount)
+        # Convert amount to float (Tribute sends cents/kopecks for all currencies)
+        amount_float = float(amount) / 100 if currency in ("USD", "EUR", "RUB") else float(amount)
 
         async with self.async_session_factory() as session:
             # Check if user exists
@@ -321,7 +321,7 @@ class TributeService:
         months = period_to_months.get(period, 1)
 
         # Convert amount to float (RUB is in kopecks from Tribute)
-        amount_float = float(amount) / 100 if currency in ("USD", "EUR") else float(amount)
+        amount_float = float(amount) / 100 if currency in ("USD", "EUR", "RUB") else float(amount)
 
         async with self.async_session_factory() as session:
             # Check if user exists
