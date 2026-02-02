@@ -350,19 +350,21 @@ class TributeService:
                 return web.Response(text="OK")
 
             # Create payment record
-            payment_record = await payment_dal.create_payment(session, {
+            months_int = int(months) if months >= 1 else 1
+            payment_record = await payment_dal.create_payment_record(session, {
                 "user_id": telegram_user_id,
                 "amount": amount_float,
                 "currency": currency,
-                "months": months if months >= 1 else 1,
+                "subscription_duration_months": months_int,
                 "status": "pending",
                 "provider": "tribute",
                 "provider_payment_id": provider_payment_id,
+                "description": f"Tribute subscription {months_int} month(s)",
             })
             await session.commit()
-            payment_db_id = payment_record.id
+            payment_db_id = payment_record.payment_id
 
-            logging.info(f"Tribute subscription webhook: created payment {payment_db_id} for user {telegram_user_id}, {months} month(s)")
+            logging.info(f"Tribute subscription webhook: created payment {payment_db_id} for user {telegram_user_id}, {months_int} month(s)")
 
             # Activate subscription
             activation = None
@@ -370,7 +372,7 @@ class TributeService:
                 activation = await self.subscription_service.activate_subscription(
                     session=session,
                     user_id=telegram_user_id,
-                    months=months if months >= 1 else 1,
+                    months=months_int,
                     payment_amount=amount_float,
                     payment_db_id=payment_db_id,
                     provider="tribute",
@@ -394,8 +396,9 @@ class TributeService:
                     referral_bonus = await self.referral_service.apply_referral_bonuses_for_payment(
                         session=session,
                         referee_user_id=telegram_user_id,
-                        payment_amount=amount_float,
-                        payment_id=payment_db_id,
+                        purchased_subscription_months=months_int,
+                        current_payment_db_id=payment_db_id,
+                        skip_if_active_before_payment=False,
                     )
                 except Exception as e:
                     logging.warning(f"Tribute subscription webhook: referral bonus failed: {e}")
@@ -408,13 +411,14 @@ class TributeService:
                     await self._send_success_notification(
                         session=session,
                         user_id=telegram_user_id,
-                        months=months if months >= 1 else 1,
+                        months=months_int,
                         activation=activation,
                         referral_bonus=referral_bonus,
                         sale_mode="subscription",
                         db_user=db_user,
                         amount=amount_float,
                         currency=currency,
+                        is_tribute_subscription=True,
                     )
                 except Exception as e:
                     logging.error(f"Tribute subscription webhook: failed to send notification: {e}")
@@ -432,6 +436,7 @@ class TributeService:
         db_user,
         amount: float,
         currency: str,
+        is_tribute_subscription: bool = False,
     ):
         """Send payment success notification to user."""
         lang = db_user.language_code if db_user and db_user.language_code else self.settings.DEFAULT_LANGUAGE
@@ -485,6 +490,20 @@ class TributeService:
                 end_date=end_date_str,
                 config_link=config_link_text,
             )
+
+        # Add Tribute subscription notice
+        if is_tribute_subscription:
+            if lang == "ru":
+                tribute_notice = (
+                    "\n\n📱 <b>Подписка оформлена через Tribute</b>\n"
+                    "Управление подпиской: @tribute"
+                )
+            else:
+                tribute_notice = (
+                    "\n\n📱 <b>Subscription via Tribute</b>\n"
+                    "Manage subscription: @tribute"
+                )
+            text += tribute_notice
 
         markup = get_connect_and_main_keyboard(
             lang,
