@@ -6,9 +6,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from config.settings import Settings
 from bot.services.referral_service import ReferralService
+from bot.utils.pricing import get_user_prices
 
 from bot.keyboards.inline.user_keyboards import get_back_to_main_menu_markup
 from bot.middlewares.i18n import JsonI18n
+from db.dal import user_dal
 
 router = Router(name="user_referral_router")
 
@@ -73,13 +75,17 @@ async def referral_command_handler(event: Union[types.Message,
             await event.answer()
         return
 
+    db_user = await user_dal.get_user_by_id(session, inviter_user_id)
+    registration_date = db_user.registration_date if db_user else None
+    user_prices = get_user_prices(settings, registration_date)
+
     bonus_info_parts = []
     if getattr(settings, "traffic_sale_mode", False):
         bonus_details_str = _("referral_not_available_for_traffic")
     else:
-        if settings.subscription_options:
+        if user_prices.subscription_options:
             for months_period_key, _price in sorted(
-                    settings.subscription_options.items()):
+                    user_prices.subscription_options.items()):
 
                 inv_bonus = settings.referral_bonus_inviter.get(months_period_key)
                 ref_bonus = settings.referral_bonus_referee.get(months_period_key)

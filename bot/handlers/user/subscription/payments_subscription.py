@@ -6,7 +6,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.keyboards.inline.user_keyboards import get_payment_method_keyboard
 from bot.middlewares.i18n import JsonI18n
+from bot.utils.pricing import get_user_prices
 from config.settings import Settings
+from db.dal import user_dal
 
 router = Router(name="user_subscription_payments_selection_router")
 
@@ -29,8 +31,12 @@ async def select_subscription_period_callback_handler(
             pass
         return
 
-    traffic_packages = getattr(settings, "traffic_packages", {}) or {}
-    stars_traffic_packages = getattr(settings, "stars_traffic_packages", {}) or {}
+    db_user = await user_dal.get_user_by_id(session, callback.from_user.id)
+    registration_date = db_user.registration_date if db_user else None
+    user_prices = get_user_prices(settings, registration_date)
+
+    traffic_packages = user_prices.traffic_packages or {}
+    stars_traffic_packages = user_prices.stars_traffic_packages or {}
     traffic_mode = bool(getattr(settings, "traffic_sale_mode", False) or stars_traffic_packages)
     try:
         months = float(callback.data.split(":")[-1])
@@ -42,8 +48,8 @@ async def select_subscription_period_callback_handler(
             pass
         return
 
-    price_source = traffic_packages if traffic_mode else settings.subscription_options
-    stars_price_source = stars_traffic_packages if traffic_mode else settings.stars_subscription_options
+    price_source = traffic_packages if traffic_mode else user_prices.subscription_options
+    stars_price_source = stars_traffic_packages if traffic_mode else user_prices.stars_subscription_options
 
     price_rub = price_source.get(months)
     stars_price = stars_price_source.get(months)

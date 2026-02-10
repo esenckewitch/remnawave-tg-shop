@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field, ValidationError, computed_field, field_validator
 from typing import Optional, List, Dict, Any
@@ -147,6 +148,25 @@ class Settings(BaseSettings):
     STARS_PRICE_3_MONTHS: Optional[int] = Field(default=None)
     STARS_PRICE_6_MONTHS: Optional[int] = Field(default=None)
     STARS_PRICE_12_MONTHS: Optional[int] = Field(default=None)
+
+    PRICE_CHANGE_DATE: Optional[str] = Field(
+        default=None,
+        description="ISO datetime cutoff (e.g. 2025-06-01T00:00:00+00:00). Users registered before this date keep old prices."
+    )
+
+    RUB_PRICE_1_MONTH_NEW: Optional[int] = Field(default=None)
+    RUB_PRICE_3_MONTHS_NEW: Optional[int] = Field(default=None)
+    RUB_PRICE_6_MONTHS_NEW: Optional[int] = Field(default=None)
+    RUB_PRICE_12_MONTHS_NEW: Optional[int] = Field(default=None)
+
+    STARS_PRICE_1_MONTH_NEW: Optional[int] = Field(default=None)
+    STARS_PRICE_3_MONTHS_NEW: Optional[int] = Field(default=None)
+    STARS_PRICE_6_MONTHS_NEW: Optional[int] = Field(default=None)
+    STARS_PRICE_12_MONTHS_NEW: Optional[int] = Field(default=None)
+
+    TRAFFIC_PACKAGES_NEW: Optional[str] = Field(default=None)
+    STARS_TRAFFIC_PACKAGES_NEW: Optional[str] = Field(default=None)
+
     PANEL_WEBHOOK_SECRET: Optional[str] = Field(default=None)
 
     TRAFFIC_PACKAGES: Optional[str] = Field(
@@ -164,22 +184,22 @@ class Settings(BaseSettings):
     SUBSCRIPTION_NOTIFY_DAYS_BEFORE: int = Field(default=3)
 
     REFERRAL_BONUS_DAYS_INVITER_1_MONTH: Optional[int] = Field(
-        default=3, alias="REFERRAL_BONUS_DAYS_1_MONTH")
+        default=7, alias="REFERRAL_BONUS_DAYS_1_MONTH")
     REFERRAL_BONUS_DAYS_INVITER_3_MONTHS: Optional[int] = Field(
-        default=7, alias="REFERRAL_BONUS_DAYS_3_MONTHS")
+        default=23, alias="REFERRAL_BONUS_DAYS_3_MONTHS")
     REFERRAL_BONUS_DAYS_INVITER_6_MONTHS: Optional[int] = Field(
-        default=15, alias="REFERRAL_BONUS_DAYS_6_MONTHS")
+        default=45, alias="REFERRAL_BONUS_DAYS_6_MONTHS")
     REFERRAL_BONUS_DAYS_INVITER_12_MONTHS: Optional[int] = Field(
-        default=30, alias="REFERRAL_BONUS_DAYS_12_MONTHS")
+        default=90, alias="REFERRAL_BONUS_DAYS_12_MONTHS")
 
     REFERRAL_BONUS_DAYS_REFEREE_1_MONTH: Optional[int] = Field(
-        default=1, alias="REFEREE_BONUS_DAYS_1_MONTH")
+        default=7, alias="REFEREE_BONUS_DAYS_1_MONTH")
     REFERRAL_BONUS_DAYS_REFEREE_3_MONTHS: Optional[int] = Field(
-        default=3, alias="REFEREE_BONUS_DAYS_3_MONTHS")
+        default=23, alias="REFEREE_BONUS_DAYS_3_MONTHS")
     REFERRAL_BONUS_DAYS_REFEREE_6_MONTHS: Optional[int] = Field(
-        default=7, alias="REFEREE_BONUS_DAYS_6_MONTHS")
+        default=45, alias="REFEREE_BONUS_DAYS_6_MONTHS")
     REFERRAL_BONUS_DAYS_REFEREE_12_MONTHS: Optional[int] = Field(
-        default=15, alias="REFEREE_BONUS_DAYS_12_MONTHS")
+        default=90, alias="REFEREE_BONUS_DAYS_12_MONTHS")
 
     # Referral program configuration
     REFERRAL_ONE_BONUS_PER_REFEREE: bool = Field(
@@ -495,6 +515,105 @@ class Settings(BaseSettings):
                 logging.warning("Invalid STARS_TRAFFIC_PACKAGES entry skipped: %s", chunk)
                 continue
         return packages
+
+    @computed_field
+    @property
+    def price_change_date_parsed(self) -> Optional[datetime]:
+        if not self.PRICE_CHANGE_DATE:
+            return None
+        try:
+            return datetime.fromisoformat(self.PRICE_CHANGE_DATE)
+        except (ValueError, TypeError):
+            logging.warning("Invalid PRICE_CHANGE_DATE format: %s", self.PRICE_CHANGE_DATE)
+            return None
+
+    @computed_field
+    @property
+    def subscription_options_new(self) -> Dict[int, float]:
+        options: Dict[int, float] = {}
+        if self.MONTH_1_ENABLED and (self.RUB_PRICE_1_MONTH_NEW or self.RUB_PRICE_1_MONTH) is not None:
+            val = self.RUB_PRICE_1_MONTH_NEW if self.RUB_PRICE_1_MONTH_NEW is not None else self.RUB_PRICE_1_MONTH
+            if val is not None:
+                options[1] = float(val)
+        if self.MONTH_3_ENABLED and (self.RUB_PRICE_3_MONTHS_NEW or self.RUB_PRICE_3_MONTHS) is not None:
+            val = self.RUB_PRICE_3_MONTHS_NEW if self.RUB_PRICE_3_MONTHS_NEW is not None else self.RUB_PRICE_3_MONTHS
+            if val is not None:
+                options[3] = float(val)
+        if self.MONTH_6_ENABLED and (self.RUB_PRICE_6_MONTHS_NEW or self.RUB_PRICE_6_MONTHS) is not None:
+            val = self.RUB_PRICE_6_MONTHS_NEW if self.RUB_PRICE_6_MONTHS_NEW is not None else self.RUB_PRICE_6_MONTHS
+            if val is not None:
+                options[6] = float(val)
+        if self.MONTH_12_ENABLED and (self.RUB_PRICE_12_MONTHS_NEW or self.RUB_PRICE_12_MONTHS) is not None:
+            val = self.RUB_PRICE_12_MONTHS_NEW if self.RUB_PRICE_12_MONTHS_NEW is not None else self.RUB_PRICE_12_MONTHS
+            if val is not None:
+                options[12] = float(val)
+        return options
+
+    @computed_field
+    @property
+    def stars_subscription_options_new(self) -> Dict[int, int]:
+        options: Dict[int, int] = {}
+        if self.STARS_ENABLED and self.MONTH_1_ENABLED:
+            val = self.STARS_PRICE_1_MONTH_NEW if self.STARS_PRICE_1_MONTH_NEW is not None else self.STARS_PRICE_1_MONTH
+            if val is not None:
+                options[1] = val
+        if self.STARS_ENABLED and self.MONTH_3_ENABLED:
+            val = self.STARS_PRICE_3_MONTHS_NEW if self.STARS_PRICE_3_MONTHS_NEW is not None else self.STARS_PRICE_3_MONTHS
+            if val is not None:
+                options[3] = val
+        if self.STARS_ENABLED and self.MONTH_6_ENABLED:
+            val = self.STARS_PRICE_6_MONTHS_NEW if self.STARS_PRICE_6_MONTHS_NEW is not None else self.STARS_PRICE_6_MONTHS
+            if val is not None:
+                options[6] = val
+        if self.STARS_ENABLED and self.MONTH_12_ENABLED:
+            val = self.STARS_PRICE_12_MONTHS_NEW if self.STARS_PRICE_12_MONTHS_NEW is not None else self.STARS_PRICE_12_MONTHS
+            if val is not None:
+                options[12] = val
+        return options
+
+    @computed_field
+    @property
+    def traffic_packages_new(self) -> Dict[float, float]:
+        raw = (self.TRAFFIC_PACKAGES_NEW or "").strip()
+        if not raw:
+            return self.traffic_packages
+        packages: Dict[float, float] = {}
+        for part in raw.split(","):
+            chunk = part.strip()
+            if not chunk or ":" not in chunk:
+                continue
+            size_str, price_str = chunk.split(":", 1)
+            try:
+                size_gb = float(size_str.strip())
+                price_val = float(price_str.strip())
+                if size_gb > 0 and price_val >= 0:
+                    packages[size_gb] = price_val
+            except ValueError:
+                logging.warning("Invalid TRAFFIC_PACKAGES_NEW entry skipped: %s", chunk)
+                continue
+        return packages or self.traffic_packages
+
+    @computed_field
+    @property
+    def stars_traffic_packages_new(self) -> Dict[float, int]:
+        raw = (self.STARS_TRAFFIC_PACKAGES_NEW or "").strip()
+        if not raw:
+            return self.stars_traffic_packages
+        packages: Dict[float, int] = {}
+        for part in raw.split(","):
+            chunk = part.strip()
+            if not chunk or ":" not in chunk:
+                continue
+            size_str, price_str = chunk.split(":", 1)
+            try:
+                size_gb = float(size_str.strip())
+                price_val = int(float(price_str.strip()))
+                if size_gb > 0 and price_val >= 0:
+                    packages[size_gb] = price_val
+            except ValueError:
+                logging.warning("Invalid STARS_TRAFFIC_PACKAGES_NEW entry skipped: %s", chunk)
+                continue
+        return packages or self.stars_traffic_packages
 
     @computed_field
     @property
