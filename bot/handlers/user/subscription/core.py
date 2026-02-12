@@ -17,8 +17,7 @@ from bot.keyboards.inline.user_keyboards import (
 from bot.services.subscription_service import SubscriptionService
 from bot.services.panel_api_service import PanelApiService
 from bot.middlewares.i18n import JsonI18n
-from bot.utils.pricing import get_user_prices
-from db.dal import subscription_dal, user_billing_dal, user_dal
+from db.dal import subscription_dal, user_billing_dal
 from db.models import Subscription
 
 router = Router(name="user_subscription_core_router")
@@ -57,13 +56,9 @@ async def display_subscription_options(event: Union[types.Message, types.Callbac
             await event.answer(err_msg)
         return
 
-    db_user = await user_dal.get_user_by_id(session, event.from_user.id)
-    registration_date = db_user.registration_date if db_user else None
-    user_prices = get_user_prices(settings, registration_date)
-
     currency_symbol_val = settings.DEFAULT_CURRENCY_SYMBOL
-    traffic_packages = user_prices.traffic_packages or {}
-    stars_traffic_packages = user_prices.stars_traffic_packages or {}
+    traffic_packages = getattr(settings, "traffic_packages", {}) or {}
+    stars_traffic_packages = getattr(settings, "stars_traffic_packages", {}) or {}
     traffic_mode = bool(getattr(settings, "traffic_sale_mode", False) or stars_traffic_packages)
 
     if traffic_mode:
@@ -75,7 +70,7 @@ async def display_subscription_options(event: Union[types.Message, types.Callbac
         else:
             options = {}
     else:
-        options = user_prices.subscription_options
+        options = settings.subscription_options
 
     if options:
         text_content = get_text("select_traffic_package") if traffic_mode else get_text("select_subscription_period")

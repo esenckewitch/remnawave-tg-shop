@@ -8,7 +8,6 @@ from bot.middlewares.i18n import JsonI18n
 from db.dal import user_dal, subscription_dal, promo_code_dal, payment_dal, user_billing_dal
 from bot.utils.date_utils import add_months
 from bot.utils.config_link import prepare_config_links
-from bot.utils.pricing import get_user_prices
 from db.models import User, Subscription
 
 from config.settings import Settings
@@ -987,10 +986,7 @@ class SubscriptionService:
             return False
 
         months = sub.duration_months or 1
-        db_user = await user_dal.get_user_by_id(session, sub.user_id)
-        registration_date = db_user.registration_date if db_user else None
-        user_prices = get_user_prices(self.settings, registration_date)
-        amount = user_prices.subscription_options.get(months)
+        amount = self.settings.subscription_options.get(months)
         if not amount:
             logging.error(f"Auto-renew price missing for {months} months")
             return False
