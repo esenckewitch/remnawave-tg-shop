@@ -112,6 +112,26 @@ def _migration_0003_normalize_referral_codes(connection: Connection) -> None:
         )
     )
 
+
+def _migration_0004_add_has_seen_onboarding(connection: Connection) -> None:
+    inspector = inspect(connection)
+    columns: Set[str] = {col["name"] for col in inspector.get_columns("users")}
+
+    if "has_seen_onboarding" not in columns:
+        # Add column with default FALSE
+        connection.execute(
+            text(
+                "ALTER TABLE users ADD COLUMN has_seen_onboarding BOOLEAN NOT NULL DEFAULT FALSE"
+            )
+        )
+        # Set TRUE for all existing users (only new users will see onboarding)
+        connection.execute(
+            text(
+                "UPDATE users SET has_seen_onboarding = TRUE WHERE has_seen_onboarding = FALSE"
+            )
+        )
+
+
 MIGRATIONS: List[Migration] = [
     Migration(
         id="0001_add_channel_subscription_fields",
@@ -127,6 +147,11 @@ MIGRATIONS: List[Migration] = [
         id="0003_normalize_referral_codes",
         description="Normalize referral codes to uppercase for consistent lookups",
         upgrade=_migration_0003_normalize_referral_codes,
+    ),
+    Migration(
+        id="0004_add_has_seen_onboarding",
+        description="Add has_seen_onboarding field for tracking first-time users",
+        upgrade=_migration_0004_add_has_seen_onboarding,
     ),
 ]
 

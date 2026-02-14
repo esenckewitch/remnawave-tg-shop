@@ -105,6 +105,7 @@ async def display_subscription_options(event: Union[types.Message, types.Callbac
 
 @router.callback_query(F.data == "main_action:subscribe")
 async def reshow_subscription_options_callback(callback: types.CallbackQuery, i18n_data: dict, settings: Settings, session: AsyncSession):
+    await callback.answer()
     await display_subscription_options(callback, i18n_data, settings, session)
 
 

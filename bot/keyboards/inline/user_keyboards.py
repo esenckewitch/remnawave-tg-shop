@@ -13,21 +13,24 @@ def get_main_menu_inline_keyboard(
     _ = lambda key, **kwargs: i18n_instance.gettext(lang, key, **kwargs)
     builder = InlineKeyboardBuilder()
 
+    # Trial button first (if enabled) - more prominent
     if show_trial_button and settings.TRIAL_ENABLED:
         builder.row(
             InlineKeyboardButton(text=_(key="menu_activate_trial_button"),
                                  callback_data="main_action:request_trial"))
 
-    builder.row(
-        InlineKeyboardButton(text=_(key="menu_subscribe_inline"),
-                             callback_data="main_action:subscribe"))
-    builder.row(
-        InlineKeyboardButton(
-            text=_(key="menu_my_subscription_inline"),
-            callback_data="main_action:my_subscription",
-        )
+    # Subscribe and My Subscription in one row - more compact
+    subscribe_button = InlineKeyboardButton(
+        text=_(key="menu_subscribe_inline"),
+        callback_data="main_action:subscribe"
     )
+    my_sub_button = InlineKeyboardButton(
+        text=_(key="menu_my_subscription_inline"),
+        callback_data="main_action:my_subscription"
+    )
+    builder.row(subscribe_button, my_sub_button)
 
+    # Referral button on separate row
     referral_button = InlineKeyboardButton(
         text=_(key="menu_referral_inline"),
         callback_data="main_action:referral")

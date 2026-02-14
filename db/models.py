@@ -29,6 +29,7 @@ class User(Base):
     channel_subscription_checked_at = Column(DateTime(timezone=True),
                                              nullable=True)
     channel_subscription_verified_for = Column(BigInteger, nullable=True)
+    has_seen_onboarding = Column(Boolean, default=False, nullable=False)
 
     referrer = relationship("User", remote_side=[user_id], backref="referrals")
     subscriptions = relationship("Subscription",

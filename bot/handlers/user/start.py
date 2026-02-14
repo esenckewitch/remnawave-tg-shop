@@ -74,8 +74,8 @@ async def send_main_menu(target_event: Union[types.Message,
             )
 
     text = _(key="main_menu_greeting", user_name=user_full_name)
-    reply_markup = get_main_menu_inline_keyboard(current_lang, i18n, settings,
-                                                 show_trial_button_in_menu)
+    inline_markup = get_main_menu_inline_keyboard(current_lang, i18n, settings,
+                                                   show_trial_button_in_menu)
 
     target_message_obj: Optional[types.Message] = None
     if isinstance(target_event, types.Message):
@@ -95,9 +95,9 @@ async def send_main_menu(target_event: Union[types.Message,
 
     try:
         if is_edit:
-            await target_message_obj.edit_text(text, reply_markup=reply_markup)
+            await target_message_obj.edit_text(text, reply_markup=inline_markup)
         else:
-            await target_message_obj.answer(text, reply_markup=reply_markup)
+            await target_message_obj.answer(text, reply_markup=inline_markup)
 
         if isinstance(target_event, types.CallbackQuery):
             try:
@@ -458,9 +458,56 @@ async def start_command_handler(message: types.Message,
                                                       db_user):
         return
 
+    # Check if this is a first-time user and show onboarding
+    is_first_time = False
+    if db_user and not db_user.has_seen_onboarding:
+        is_first_time = True
+
+    # Show onboarding for new users
+    if is_first_time and settings.TRIAL_ENABLED and not settings.DISABLE_WELCOME_MESSAGE:
+        onboarding_text = _(
+            "onboarding_first_time",
+            user_name=hd.quote(user.full_name)
+        )
+
+        from aiogram.utils.keyboard import InlineKeyboardBuilder
+        from aiogram.types import InlineKeyboardButton
+
+        builder = InlineKeyboardBuilder()
+
+        # Main button - try trial
+        builder.row(
+            InlineKeyboardButton(
+                text=_(key="menu_activate_trial_button"),
+                callback_data="main_action:request_trial"
+            )
+        )
+
+        # Second button - skip and see menu
+        builder.row(
+            InlineKeyboardButton(
+                text=_(key="onboarding_explore_button"),
+                callback_data="main_action:skip_onboarding"
+            )
+        )
+
+        await message.answer(
+            onboarding_text,
+            reply_markup=builder.as_markup(),
+            parse_mode="HTML"
+        )
+
+        # Mark that onboarding was shown
+        await user_dal.update_user(session, user_id, {"has_seen_onboarding": True})
+        await session.commit()
+
+        return  # Don't show main menu
+
     # Send welcome message if not disabled
     if not settings.DISABLE_WELCOME_MESSAGE:
-        await message.answer(_(key="welcome", user_name=hd.quote(user.full_name)))
+        await message.answer(
+            _(key="welcome", user_name=hd.quote(user.full_name))
+        )
 
     # Auto-apply promo code if provided via start parameter
     if promo_code_to_apply:
@@ -661,6 +708,9 @@ async def main_action_callback_handler(
         i18n_data: dict, bot: Bot, subscription_service: SubscriptionService,
         referral_service: ReferralService, panel_service: PanelApiService,
         promo_code_service: PromoCodeService, session: AsyncSession):
+    # ✅ Сразу даём feedback пользователю
+    await callback.answer()
+
     action = callback.data.split(":")[1]
     user_id = callback.from_user.id
 
@@ -710,6 +760,14 @@ async def main_action_callback_handler(
                              subscription_service,
                              session,
                              is_edit=False)
+    elif action == "skip_onboarding":
+        # User clicked "I'll look around first" - show main menu
+        await send_main_menu(callback,
+                             settings,
+                             i18n_data,
+                             subscription_service,
+                             session,
+                             is_edit=True)
     else:
         i18n: Optional[JsonI18n] = i18n_data.get("i18n_instance")
         _ = lambda key, **kwargs: i18n.gettext(

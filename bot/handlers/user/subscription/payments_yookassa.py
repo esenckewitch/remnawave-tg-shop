@@ -11,6 +11,7 @@ from bot.keyboards.inline.user_keyboards import (
     get_yk_saved_cards_keyboard,
 )
 from bot.middlewares.i18n import JsonI18n
+from .payment_status_tracker import start_payment_tracking
 from bot.services.yookassa_service import YooKassaService
 from config.settings import Settings
 from db.dal import payment_dal, user_billing_dal
@@ -249,6 +250,18 @@ async def _initiate_yk_payment(
                 )
             except Exception:
                 pass
+
+        # ✅ Запускаем трекинг статуса оплаты
+        start_payment_tracking(
+            bot=callback.bot,
+            user_id=user_id,
+            payment_id=payment_response_yk.get("id", str(db_payment_record.payment_id)),
+            i18n=i18n,
+            current_lang=current_lang,
+            session=session,
+            provider="yookassa",
+        )
+
         return True
 
     if payment_response_yk and payment_method_id:

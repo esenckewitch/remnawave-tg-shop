@@ -6,6 +6,10 @@
   "channel_subscription_check_failed": "Couldn't verify the subscription. Please try again later or contact support.",
   "channel_subscription_verified_success": "✅ Subscription confirmed! You're good to go.",
   "main_menu_greeting": "Hi, {user_name}! 👋\n\n🚀 Fast and reliable VPN based on VLESS and XRAY\n🔒 Maximum privacy with no logs\n💼 Internet without borders\n\nChoose an action:",
+  "onboarding_first_time": "Hi, {user_name}! 👋\n\nI'll help you set up VPN in 1 minute\n\n<b>What I can do:</b>\n✅ 3 days free\n✅ Works with YouTube, Instagram, TikTok  \n✅ Quick setup\n\nLet's start? 👇",
+  "onboarding_explore_button": "I'll look around first",
+  "menu_input_placeholder": "Choose an action...",
+  "menu_opened": "📱 Menu opened! Use buttons below for navigation.",
   "menu_activate_trial_button": "🆓 Free Trial",
   "menu_subscribe_inline": "🚀 Purchase",
   "menu_my_subscription_inline": "🔐 My Subscription",
@@ -247,7 +251,7 @@
   "subscription_expired_notification": "👋 Hi, {user_name}!\n\n⛔ Your VPN subscription expired on {end_date}.\n\nPlease renew it using the button below.",
   "subscription_expired_yesterday_notification": "👋 Hi, {user_name}!\n\n⏳ Your VPN subscription expired yesterday ({end_date}).\n\nPlease renew it using the button below.",
   "user_not_connected_notification": "You haven't finished setting up your VPN connection. It's a great time to do it 👇",
-  "trial_not_connected_reminder": "👋 I see your VPN isn't connected yet.\n\nStuck on a step? Let me know what's not working — I'll help you figure it out.\n\nOr if now isn't a good time — come back later, your free trial is already activated.",
+  "trial_not_connected_reminder": "👋 Hey! VPN isn't connected yet.\n\n💡 <b>Where are you stuck?</b> Let me know — I'll help!\n\nOr come back when it's convenient — your 3 days are already activated ✅",
   "autorenew_48h_charge_tomorrow_notice": "🔔 Reminder\n\nTomorrow an automatic charge will occur to renew your subscription. If you don't want auto-renew, disable it using the button below.",
   "autorenew_confirm_enable": "🔄 Enable auto-renew? An automatic charge will be attempted before your subscription ends.",
   "autorenew_confirm_disable": "🛑 Disable auto-renew? No further automatic charges will occur.",
@@ -489,5 +493,8 @@
   "admin_ads_delete_confirm": "Are you sure you want to delete campaign #{id}? This action is irreversible.",
   "admin_ads_deleted_success": "Campaign deleted.",
   "admin_ads_not_found": "Campaign not found.",
-  "free_kassa_order_full": "Order #{order_id} from {date}\n\n"
+  "free_kassa_order_full": "Order #{order_id} from {date}\n\n",
+  "payment_redirect_message": "Redirecting to payment... 💳\n\nOnce you pay — you'll get instant access! 🚀",
+  "payment_checking_message": "⏳ Checking payment...\n\nUsually takes 10-30 seconds",
+  "payment_delayed_message": "Payment is still being verified... ⏰\n\nIf something went wrong — contact support:\n@Forours_Helper\n\nWe'll help!"
 }

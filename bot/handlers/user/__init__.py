@@ -6,6 +6,7 @@ from .subscription import router as subscription_router
 from . import referral
 from . import promo_user
 from . import trial_handler
+from . import menu_handler
 
 user_router_aggregate = Router(name="user_router_aggregate")
 
@@ -14,3 +15,5 @@ user_router_aggregate.include_router(trial_handler.router)
 user_router_aggregate.include_router(start.router)
 user_router_aggregate.include_router(subscription_router)
 user_router_aggregate.include_router(referral.router)
+# Menu handler должен быть последним, так как использует F.text filter
+user_router_aggregate.include_router(menu_handler.router)

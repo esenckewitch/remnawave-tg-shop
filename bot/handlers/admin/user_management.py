@@ -656,6 +656,7 @@ async def handle_delete_user_prompt(callback: types.CallbackQuery, state: FSMCon
                                     user: User, settings: Settings, i18n_instance,
                                     lang: str, session: AsyncSession):
     """Trigger confirmation workflow for destructive deletion."""
+    logging.info(f"🔍 handle_delete_user_prompt called for user {user.user_id} by admin {callback.from_user.id}")
     _ = lambda key, **kwargs: i18n_instance.gettext(lang, key, **kwargs)
 
     admin = callback.from_user
@@ -733,6 +734,7 @@ async def process_delete_user_confirmation_handler(message: types.Message,
                                                    panel_service: PanelApiService,
                                                    session: AsyncSession):
     """Confirm and execute destructive user deletion."""
+    logging.info(f"🔍 process_delete_user_confirmation_handler called: message='{message.text}' from user {message.from_user.id}")
     current_lang = i18n_data.get("current_language", settings.DEFAULT_LANGUAGE)
     i18n: Optional[JsonI18n] = i18n_data.get("i18n_instance")
     if not i18n:

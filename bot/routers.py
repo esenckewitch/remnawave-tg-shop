@@ -14,17 +14,17 @@ def build_root_router(settings: Settings) -> Router:
     root.message.filter(F.chat.type == "private")
     root.callback_query.filter(F.message.chat.type == "private")
 
-    # Public routers
-    root.include_router(user_router_aggregate)
-    root.include_router(inline_mode.router)
-
-    # Admin routers behind filter
+    # Admin routers behind filter - FIRST to have priority
     admin_main_router = Router(name="admin_main_filtered_router")
     admin_filter_instance = AdminFilter(admin_ids=settings.ADMIN_IDS)
     admin_main_router.message.filter(admin_filter_instance)
     admin_main_router.callback_query.filter(admin_filter_instance)
     admin_main_router.include_router(admin_router_aggregate)
     root.include_router(admin_main_router)
+
+    # Public routers - AFTER admin routers
+    root.include_router(user_router_aggregate)
+    root.include_router(inline_mode.router)
 
     return root
 
