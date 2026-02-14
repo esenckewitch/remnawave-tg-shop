@@ -24,14 +24,18 @@ async def create_message_log(session: AsyncSession,
 
 async def get_all_message_logs(session: AsyncSession, limit: int,
                                offset: int) -> List[MessageLog]:
-    stmt = select(MessageLog).order_by(
+    stmt = select(MessageLog).where(
+        MessageLog.is_admin_event == False
+    ).order_by(
         MessageLog.timestamp.desc()).limit(limit).offset(offset)
     result = await session.execute(stmt)
     return result.scalars().all()
 
 
 async def count_all_message_logs(session: AsyncSession) -> int:
-    stmt = select(func.count()).select_from(MessageLog)
+    stmt = select(func.count()).select_from(MessageLog).where(
+        MessageLog.is_admin_event == False
+    )
     result = await session.execute(stmt)
     return result.scalar_one()
 

@@ -38,6 +38,8 @@ class ActionLoggerMiddleware(BaseMiddleware):
             telegram_first_name = event_user.first_name
             if user_id in self.settings.ADMIN_IDS:
                 is_admin_event_flag = True
+                # Don't log admin actions
+                return result
 
         raw_update_snippet = None
         try:

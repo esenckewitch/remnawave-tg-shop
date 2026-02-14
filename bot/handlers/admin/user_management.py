@@ -580,7 +580,11 @@ async def handle_view_user_logs(callback: types.CallbackQuery, user: User,
             text=_(key="admin_user_back_to_card_button"),
             callback_data=f"user_action:refresh:{user.user_id}"
         )
-        builder.adjust(1)
+        builder.button(
+            text=_(key="back_to_user_management_button"),
+            callback_data="admin_action:users_management"
+        )
+        builder.adjust(1, 2)
         
         try:
             await callback.message.edit_text(
