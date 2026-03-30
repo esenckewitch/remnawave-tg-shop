@@ -38,6 +38,7 @@ from bot.services.crypto_pay_service import CryptoPayService, cryptopay_webhook_
 from bot.handlers.user import payment as user_payment_webhook_module
 from bot.handlers.admin.sync_admin import perform_sync
 from bot.utils.message_queue import init_queue_manager
+from bot.services.winback_service import WinbackService
 
 
 async def register_all_routers(dp: Dispatcher, settings: Settings):
@@ -296,7 +297,11 @@ async def run_bot(settings_param: Settings):
 
     main_tasks.append(asyncio.create_task(web_server_task(), name="AIOHTTPServerTask"))
 
-    # Recurring billing moved to panel webhook (24h before expiry). No periodic task needed here.
+    # Winback discount checker (sends discount notifications to users whose subscription expired 3 days ago)
+    if settings_param.WINBACK_DISCOUNT_ENABLED:
+        winback_service = WinbackService(bot, settings_param, i18n_instance, local_async_session_factory)
+        main_tasks.append(asyncio.create_task(winback_service.run_periodic_check(), name="WinbackCheckerTask"))
+        logging.info("Winback discount checker enabled (every %dh)", settings_param.WINBACK_CHECK_INTERVAL_HOURS)
 
     logging.info("Starting bot in Webhook mode with AIOHTTP server...")
     logging.info(f"Starting bot with main tasks: {[task.get_name() for task in main_tasks]}")

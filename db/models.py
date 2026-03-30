@@ -255,6 +255,20 @@ class AdCampaign(Base):
         return f"<AdCampaign(id={self.ad_campaign_id}, source='{self.source}', start_param='{self.start_param}', cost={self.cost})>"
 
 
+class WinbackDiscount(Base):
+    __tablename__ = "winback_discounts"
+
+    discount_id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(BigInteger, ForeignKey("users.user_id"), nullable=False, index=True)
+    discount_percent = Column(Integer, nullable=False, default=15)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    redeemed_at = Column(DateTime(timezone=True), nullable=True)
+    payment_id = Column(Integer, ForeignKey("payments.payment_id"), nullable=True)
+
+    user = relationship("User")
+
+
 class AdAttribution(Base):
     __tablename__ = "ad_attributions"
 

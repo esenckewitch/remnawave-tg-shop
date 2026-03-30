@@ -17,7 +17,7 @@ from bot.keyboards.inline.user_keyboards import (
 from bot.services.subscription_service import SubscriptionService
 from bot.services.panel_api_service import PanelApiService
 from bot.middlewares.i18n import JsonI18n
-from db.dal import subscription_dal, user_billing_dal
+from db.dal import subscription_dal, user_billing_dal, winback_dal
 from db.models import Subscription
 
 router = Router(name="user_subscription_core_router")
@@ -72,10 +72,35 @@ async def display_subscription_options(event: Union[types.Message, types.Callbac
     else:
         options = settings.subscription_options
 
+    # Check for winback discount
+    winback_discount = None
+    if settings.WINBACK_DISCOUNT_ENABLED and not traffic_mode:
+        try:
+            user_id = event.from_user.id if isinstance(event, types.CallbackQuery) else event.from_user.id
+            winback_discount = await winback_dal.get_active_discount_for_user(session, user_id)
+        except Exception:
+            logging.exception("Failed to check winback discount")
+
+    if winback_discount:
+        discount_pct = winback_discount.discount_percent
+        discounted_options = {
+            months: round(price * (1 - discount_pct / 100))
+            for months, price in options.items()
+            if price is not None
+        }
+    else:
+        discounted_options = options
+
     if options:
-        text_content = get_text("select_traffic_package") if traffic_mode else get_text("select_subscription_period")
+        if winback_discount and not traffic_mode:
+            text_content = get_text(
+                "select_subscription_period_with_discount",
+                discount_percent=winback_discount.discount_percent,
+            )
+        else:
+            text_content = get_text("select_traffic_package") if traffic_mode else get_text("select_subscription_period")
         reply_markup = get_subscription_options_keyboard(
-            options, currency_symbol_val, current_lang, i18n, traffic_mode=traffic_mode
+            discounted_options, currency_symbol_val, current_lang, i18n, traffic_mode=traffic_mode
         )
     else:
         text_content = get_text("no_subscription_options_available")

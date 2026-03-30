@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from bot.keyboards.inline.user_keyboards import get_payment_method_keyboard
 from bot.middlewares.i18n import JsonI18n
 from config.settings import Settings
+from db.dal import winback_dal
 
 router = Router(name="user_subscription_payments_selection_router")
 
@@ -49,6 +50,23 @@ async def select_subscription_period_callback_handler(
     stars_price = stars_price_source.get(months)
     currency_symbol_val = settings.DEFAULT_CURRENCY_SYMBOL
 
+    # Apply winback discount if user has an active one
+    winback_discount = None
+    if settings.WINBACK_DISCOUNT_ENABLED:
+        try:
+            winback_discount = await winback_dal.get_active_discount_for_user(
+                session, callback.from_user.id
+            )
+        except Exception:
+            logging.exception("Failed to check winback discount")
+
+    if winback_discount:
+        discount_pct = winback_discount.discount_percent
+        if price_rub is not None:
+            price_rub = round(price_rub * (1 - discount_pct / 100))
+        if stars_price is not None:
+            stars_price = int(stars_price * (1 - discount_pct / 100))
+
     if price_rub is None:
         if traffic_mode and not price_source and stars_price is not None:
             currency_methods_enabled = any(
@@ -82,7 +100,13 @@ async def select_subscription_period_callback_handler(
                 pass
             return
 
-    text_content = get_text("choose_payment_method_traffic") if traffic_mode else get_text("choose_payment_method")
+    if winback_discount and not traffic_mode:
+        text_content = get_text(
+            "choose_payment_method_with_discount",
+            discount_percent=winback_discount.discount_percent,
+        )
+    else:
+        text_content = get_text("choose_payment_method_traffic") if traffic_mode else get_text("choose_payment_method")
     reply_markup = get_payment_method_keyboard(
         months,
         price_rub,

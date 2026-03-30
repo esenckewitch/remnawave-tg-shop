@@ -132,6 +132,30 @@ def _migration_0004_add_has_seen_onboarding(connection: Connection) -> None:
         )
 
 
+def _migration_0005_add_winback_discounts(connection: Connection) -> None:
+    inspector = inspect(connection)
+    tables = inspector.get_table_names()
+    if "winback_discounts" not in tables:
+        connection.execute(
+            text(
+                """
+                CREATE TABLE winback_discounts (
+                    discount_id SERIAL PRIMARY KEY,
+                    user_id BIGINT NOT NULL REFERENCES users(user_id),
+                    discount_percent INTEGER NOT NULL DEFAULT 15,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    expires_at TIMESTAMPTZ NOT NULL,
+                    redeemed_at TIMESTAMPTZ,
+                    payment_id INTEGER REFERENCES payments(payment_id)
+                )
+                """
+            )
+        )
+        connection.execute(
+            text("CREATE INDEX IF NOT EXISTS ix_winback_discounts_user_id ON winback_discounts (user_id)")
+        )
+
+
 MIGRATIONS: List[Migration] = [
     Migration(
         id="0001_add_channel_subscription_fields",
@@ -152,6 +176,11 @@ MIGRATIONS: List[Migration] = [
         id="0004_add_has_seen_onboarding",
         description="Add has_seen_onboarding field for tracking first-time users",
         upgrade=_migration_0004_add_has_seen_onboarding,
+    ),
+    Migration(
+        id="0005_add_winback_discounts",
+        description="Add winback_discounts table for post-expiry discount notifications",
+        upgrade=_migration_0005_add_winback_discounts,
     ),
 ]
 

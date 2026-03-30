@@ -163,6 +163,18 @@ class Settings(BaseSettings):
     SUBSCRIPTION_NOTIFY_AFTER_EXPIRE: bool = Field(default=True)
     SUBSCRIPTION_NOTIFY_DAYS_BEFORE: int = Field(default=3)
 
+    WINBACK_DISCOUNT_ENABLED: bool = Field(
+        default=False,
+        description="Enable winback discount notifications 3 days after subscription expiry",
+    )
+    WINBACK_DISCOUNT_PERCENT: int = Field(default=15, description="Winback discount percentage")
+    WINBACK_DISCOUNT_VALIDITY_DAYS: int = Field(
+        default=7, description="How many days the winback discount remains valid"
+    )
+    WINBACK_CHECK_INTERVAL_HOURS: int = Field(
+        default=6, description="How often to check for winback-eligible users (hours)"
+    )
+
     REFERRAL_BONUS_DAYS_INVITER_1_MONTH: Optional[int] = Field(
         default=3, alias="REFERRAL_BONUS_DAYS_1_MONTH")
     REFERRAL_BONUS_DAYS_INVITER_3_MONTHS: Optional[int] = Field(

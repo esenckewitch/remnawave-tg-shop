@@ -691,6 +691,17 @@ class SubscriptionService:
         final_subscription_url = updated_panel_user.get("subscriptionUrl")
         final_panel_short_uuid = updated_panel_user.get("shortUuid", panel_short_uuid)
 
+        # Mark winback discount as redeemed if applicable
+        try:
+            from db.dal import winback_dal
+            active_discount = await winback_dal.get_active_discount_for_user(session, user_id)
+            if active_discount:
+                await winback_dal.mark_discount_redeemed(
+                    session, active_discount.discount_id, payment_id=payment_db_id
+                )
+        except Exception:
+            logging.exception("Failed to mark winback discount as redeemed for user %s", user_id)
+
         return {
             "subscription_id": new_or_updated_sub.subscription_id,
             "end_date": final_end_date,
