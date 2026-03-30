@@ -93,6 +93,13 @@ def get_subscription_options_keyboard(subscription_options: Dict[
     def _format_gb(val: float) -> str:
         return str(int(val)) if float(val).is_integer() else f"{val:g}"
     if subscription_options:
+        # Find 1-month price for calculating relative savings
+        base_monthly_price = None
+        if not traffic_mode:
+            one_month_price = subscription_options.get(1) or subscription_options.get(1.0)
+            if one_month_price is not None and one_month_price > 0:
+                base_monthly_price = float(one_month_price)
+
         for months, price in subscription_options.items():
             if price is not None:
                 if traffic_mode:
@@ -104,10 +111,25 @@ def get_subscription_options_keyboard(subscription_options: Dict[
                     )
                     callback_data = f"subscribe_period:{_format_gb(months)}"
                 else:
-                    button_text = _("subscribe_for_months_button",
-                                    months=months,
-                                    price=price,
-                                    currency_symbol=currency_symbol_val)
+                    # Calculate saving vs 1-month plan
+                    saving = 0
+                    if base_monthly_price and months > 1:
+                        per_month = float(price) / float(months)
+                        saving = round((1 - per_month / base_monthly_price) * 100)
+
+                    if saving > 0:
+                        button_text = _(
+                            "subscribe_for_months_button_with_saving",
+                            months=months,
+                            price=price,
+                            currency_symbol=currency_symbol_val,
+                            saving=saving,
+                        )
+                    else:
+                        button_text = _("subscribe_for_months_button",
+                                        months=months,
+                                        price=price,
+                                        currency_symbol=currency_symbol_val)
                     callback_data = f"subscribe_period:{months}"
                 builder.button(text=button_text,
                                callback_data=callback_data)
