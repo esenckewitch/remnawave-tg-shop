@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from config.settings import Settings
 
-from db.dal import user_dal, payment_dal, panel_sync_dal
+from db.dal import user_dal, payment_dal, panel_sync_dal, winback_dal
 from db.models import Payment, PanelSyncStatus
 from bot.services.panel_api_service import PanelApiService
 
@@ -197,6 +197,32 @@ async def show_statistics_handler(callback: types.CallbackQuery,
                   p_date=payment_date_str))
     else:
         stats_text_parts.append(f"\n{_('admin_stats_no_payments_found')}")
+
+    # Winback statistics
+    if settings.WINBACK_DISCOUNT_ENABLED:
+        try:
+            wb_stats = await winback_dal.get_winback_statistics(session)
+            stats_text_parts.append(f"\n<b>🔄 {_('admin_winback_stats_header')}</b>")
+            stats_text_parts.append(
+                f"📨 {_('admin_winback_sent_label')}: <b>{wb_stats['total_sent']}</b>"
+            )
+            stats_text_parts.append(
+                f"✅ {_('admin_winback_redeemed_label')}: <b>{wb_stats['total_redeemed']}</b>"
+            )
+            stats_text_parts.append(
+                f"📊 {_('admin_winback_conversion_label')}: <b>{wb_stats['conversion_rate']:.1f}%</b>"
+            )
+            stats_text_parts.append(
+                f"💰 {_('admin_winback_revenue_label')}: <b>{wb_stats['winback_revenue']:.2f} RUB</b>"
+            )
+            stats_text_parts.append(
+                f"⏳ {_('admin_winback_pending_label')}: <b>{wb_stats['active_pending']}</b>"
+            )
+            stats_text_parts.append(
+                f"❌ {_('admin_winback_expired_label')}: <b>{wb_stats['expired_unused']}</b>"
+            )
+        except Exception as e:
+            logging.error(f"Failed to fetch winback statistics: {e}", exc_info=True)
 
     sync_status_model: Optional[
         PanelSyncStatus] = await panel_sync_dal.get_panel_sync_status(session)

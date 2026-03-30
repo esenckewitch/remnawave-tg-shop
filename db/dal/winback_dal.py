@@ -2,11 +2,11 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import Optional, List
 
-from sqlalchemy import select, and_, not_
+from sqlalchemy import select, and_, not_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from db.models import WinbackDiscount, Subscription, User
+from db.models import WinbackDiscount, Subscription, User, Payment
 
 
 async def get_active_discount_for_user(
@@ -95,3 +95,62 @@ async def get_users_for_winback(
         )
     )
     return list(result.scalars().all())
+
+
+async def get_winback_statistics(session: AsyncSession) -> dict:
+    """Get winback discount statistics for admin panel."""
+    # Total discounts sent
+    total_result = await session.execute(
+        select(func.count(WinbackDiscount.discount_id))
+    )
+    total_sent = total_result.scalar() or 0
+
+    # Redeemed (converted)
+    redeemed_result = await session.execute(
+        select(func.count(WinbackDiscount.discount_id))
+        .where(WinbackDiscount.redeemed_at.is_not(None))
+    )
+    total_redeemed = redeemed_result.scalar() or 0
+
+    # Revenue from winback payments
+    revenue_result = await session.execute(
+        select(func.coalesce(func.sum(Payment.amount), 0.0))
+        .join(WinbackDiscount, WinbackDiscount.payment_id == Payment.payment_id)
+        .where(
+            WinbackDiscount.redeemed_at.is_not(None),
+            Payment.status == "succeeded",
+        )
+    )
+    winback_revenue = float(revenue_result.scalar() or 0.0)
+
+    # Active (pending) discounts
+    now = datetime.now(timezone.utc)
+    active_result = await session.execute(
+        select(func.count(WinbackDiscount.discount_id))
+        .where(
+            WinbackDiscount.redeemed_at.is_(None),
+            WinbackDiscount.expires_at > now,
+        )
+    )
+    active_pending = active_result.scalar() or 0
+
+    # Expired unused
+    expired_result = await session.execute(
+        select(func.count(WinbackDiscount.discount_id))
+        .where(
+            WinbackDiscount.redeemed_at.is_(None),
+            WinbackDiscount.expires_at <= now,
+        )
+    )
+    expired_unused = expired_result.scalar() or 0
+
+    conversion_rate = (total_redeemed / total_sent * 100) if total_sent > 0 else 0.0
+
+    return {
+        "total_sent": total_sent,
+        "total_redeemed": total_redeemed,
+        "active_pending": active_pending,
+        "expired_unused": expired_unused,
+        "conversion_rate": conversion_rate,
+        "winback_revenue": winback_revenue,
+    }
